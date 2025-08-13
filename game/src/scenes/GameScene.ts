@@ -1,5 +1,10 @@
 import Phaser from 'phaser';
 
+const LANE_TOP = 360;
+const LANE_BOTTOM = 520;
+const LANE_SOFT_SNAP = 0.12;
+const LANE_SOFT_ZONE = 10;
+
 type Keys = {
   up: Phaser.Input.Keyboard.Key;
   down: Phaser.Input.Keyboard.Key;
@@ -16,7 +21,6 @@ export class GameScene extends Phaser.Scene {
   private keys!: Keys;
   private player!: Phaser.Physics.Arcade.Sprite;
   private worldWidth = 8000;
-  private lanes = { top: 360, bottom: 520 }; // belt-scroller vertical band
   private speed = 220;
 
   private enemies!: Phaser.Physics.Arcade.Group;
@@ -33,7 +37,7 @@ export class GameScene extends Phaser.Scene {
     this.addParallax();
 
     // player spawn
-    this.player = this.physics.add.sprite(120, this.lanes.bottom, 'ivan');
+    this.player = this.physics.add.sprite(120, LANE_BOTTOM, 'ivan');
     this.player.setCollideWorldBounds(true);
     this.player.setDepth(this.player.y);
 
@@ -90,7 +94,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private spawnEnemy(x: number){
-    const y = Phaser.Math.Between(this.lanes.top, this.lanes.bottom);
+    const y = Phaser.Math.Between(LANE_TOP, LANE_BOTTOM);
     const e = this.physics.add.sprite(x, y, 'hr_1');
     e.setImmovable(true);
     (e as any).health = 5;
@@ -105,7 +109,26 @@ export class GameScene extends Phaser.Scene {
     const vx = (this.isDown(this.keys.d, this.keys.right) ? 1 : 0) - (this.isDown(this.keys.a, this.keys.left) ? 1 : 0);
     const vy = (this.isDown(this.keys.s, this.keys.down) ? 1 : 0) - (this.isDown(this.keys.w, this.keys.up) ? 1 : 0);
     this.player.x += vx * this.speed * dt;
-    this.player.y = Phaser.Math.Clamp(this.player.y + vy * this.speed * 0.7 * dt, this.lanes.top, this.lanes.bottom);
+    if (vy !== 0) {
+      this.player.y = Phaser.Math.Clamp(
+        this.player.y + vy * this.speed * 0.7 * dt,
+        LANE_TOP,
+        LANE_BOTTOM
+      );
+    } else {
+      const distTop = Math.abs(this.player.y - LANE_TOP);
+      const distBottom = Math.abs(this.player.y - LANE_BOTTOM);
+      const target = distTop < distBottom ? LANE_TOP : LANE_BOTTOM;
+      if (Math.abs(this.player.y - target) <= LANE_SOFT_ZONE) {
+        this.player.y = target;
+      } else {
+        this.player.y = Phaser.Math.Clamp(
+          Phaser.Math.Linear(this.player.y, target, LANE_SOFT_SNAP),
+          LANE_TOP,
+          LANE_BOTTOM
+        );
+      }
+    }
     this.player.setDepth(this.player.y);
 
     // face direction
