@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { DummyBoss } from '../entities/boss/DummyBoss';
 
 const LANE_TOP = 360;
 const LANE_BOTTOM = 520;
@@ -26,6 +27,8 @@ export class GameScene extends Phaser.Scene {
   private enemies!: Phaser.Physics.Arcade.Group;
   private bullets!: Phaser.Physics.Arcade.Group;
 
+  private boss!: DummyBoss;
+
   private hudText!: Phaser.GameObjects.Text;
 
   constructor(){ super('game'); }
@@ -44,6 +47,14 @@ export class GameScene extends Phaser.Scene {
     // groups
     this.enemies = this.physics.add.group();
     this.bullets = this.physics.add.group();
+
+    // dummy boss
+    this.boss = new DummyBoss(this, 1000, LANE_TOP);
+
+    this.time.addEvent({
+      delay: 2000,
+      callback: () => this.boss.setState('rage')
+    });
 
     // spawn a few enemies to start
     for(let i=0;i<20;i++) this.spawnEnemy(600 + i*180 + Phaser.Math.Between(-40,40));
