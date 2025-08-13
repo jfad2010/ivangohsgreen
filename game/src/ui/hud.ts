@@ -9,6 +9,7 @@ export interface HudState {
   command: string;
   beamCharge: number; // 0..1
   beamCooldown: number; // 0..1
+  shieldCooldown: number; // 0..1
 }
 
 /**
@@ -26,14 +27,18 @@ export class HUD {
   private beamCooldownBar: Phaser.GameObjects.Graphics;
   private beamChargeBg: Phaser.GameObjects.Graphics;
   private beamCooldownBg: Phaser.GameObjects.Graphics;
+  private shieldCooldownBar: Phaser.GameObjects.Graphics;
+  private shieldCooldownBg: Phaser.GameObjects.Graphics;
 
   private readonly barWidth = 120;
   private readonly barHeight = 8;
   private chargePos: { x: number; y: number };
   private cooldownPos: { x: number; y: number };
+  private shieldPos: { x: number; y: number };
 
   private beamChargeDisplay = 0;
   private beamCooldownDisplay = 0;
+  private shieldCooldownDisplay = 0;
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
@@ -62,6 +67,13 @@ export class HUD {
     this.beamCooldownBg.fillStyle(0x333333, 1).fillRect(16, y, this.barWidth, this.barHeight);
     this.beamCooldownBar = scene.add.graphics().setScrollFactor(0);
     this.cooldownPos = { x: 16, y };
+    y += this.barHeight + 4;
+
+    // Shield cooldown bar
+    this.shieldCooldownBg = scene.add.graphics().setScrollFactor(0);
+    this.shieldCooldownBg.fillStyle(0x333333, 1).fillRect(16, y, this.barWidth, this.barHeight);
+    this.shieldCooldownBar = scene.add.graphics().setScrollFactor(0);
+    this.shieldPos = { x: 16, y };
   }
 
   update(dt: number, state: HudState): void {
@@ -81,9 +93,11 @@ export class HUD {
     const lerpAmt = Phaser.Math.Clamp(dt * 5, 0, 1);
     this.beamChargeDisplay = Phaser.Math.Linear(this.beamChargeDisplay, state.beamCharge, lerpAmt);
     this.beamCooldownDisplay = Phaser.Math.Linear(this.beamCooldownDisplay, state.beamCooldown, lerpAmt);
+    this.shieldCooldownDisplay = Phaser.Math.Linear(this.shieldCooldownDisplay, state.shieldCooldown, lerpAmt);
 
     this.drawBar(this.beamChargeBar, this.chargePos, this.beamChargeDisplay, 0x00ff00);
     this.drawBar(this.beamCooldownBar, this.cooldownPos, this.beamCooldownDisplay, 0xff0000);
+    this.drawBar(this.shieldCooldownBar, this.shieldPos, this.shieldCooldownDisplay, 0x00aaff);
   }
 
   private drawBar(g: Phaser.GameObjects.Graphics, pos: { x: number; y: number }, value: number, color: number): void {

@@ -133,6 +133,7 @@ export class JoJoBoss extends BaseBoss {
       callback: () => {
         const b = this.scene.physics.add.sprite(this.x + Phaser.Math.Between(-80, 80), this.y - 200, 'bullet');
         b.setVelocityY(200);
+        b.setData('from', 'enemy');
         this.bullets.add(b);
       },
       repeat: duration / 200,
@@ -152,6 +153,7 @@ export class JoJoBoss extends BaseBoss {
         const b = this.scene.physics.add.sprite(this.x, this.y, 'bullet');
         b.setVelocityX(-100);
         b.setScale(2);
+        b.setData('from', 'enemy');
         this.bullets.add(b);
       },
       repeat: duration / 800,
@@ -171,6 +173,7 @@ export class JoJoBoss extends BaseBoss {
         Math.cos(angle) * speed,
         Math.sin(angle) * speed,
       );
+      b.setData('from', 'enemy');
       this.bullets.add(b);
     });
   }

@@ -30,6 +30,7 @@ type Keys = {
   two: Phaser.Input.Keyboard.Key;
   three: Phaser.Input.Keyboard.Key;
   q: Phaser.Input.Keyboard.Key;
+  e: Phaser.Input.Keyboard.Key;
 };
 
 export class GameScene extends Phaser.Scene {
@@ -55,6 +56,9 @@ export class GameScene extends Phaser.Scene {
   private currentCommand: GradCommand = 'hold';
   private bossMaxHp = 0;
   private depthUpdater = (s: Phaser.GameObjects.Sprite) => this.updateDepth(s);
+  private shield!: Phaser.Physics.Arcade.Sprite;
+  private shieldActive = false;
+  private shieldCooldown = 0;
 
   constructor(){ super('game'); }
 
@@ -64,6 +68,12 @@ export class GameScene extends Phaser.Scene {
     this.physics.world.setBounds(0, 0, this.worldWidth, 576);
     this.addParallax();
 
+    // create shield texture
+    const shieldG = this.add.graphics();
+    shieldG.fillStyle(0x00aaff, 0.3).fillCircle(32, 32, 32);
+    shieldG.generateTexture('shield', 64, 64);
+    shieldG.destroy();
+
     // player spawn
     this.player = this.physics.add.sprite(120, LANE_BOTTOM, 'ivan');
     this.player.setCollideWorldBounds(true);
@@ -72,6 +82,12 @@ export class GameScene extends Phaser.Scene {
     this.player.setData('hp', 10);
     this.player.setData('beamCharge', 1);
     this.player.setData('beamCooldown', 0);
+
+    // shield setup
+    this.shield = this.physics.add.sprite(this.player.x, this.player.y, 'shield');
+    this.shield.setCircle(32);
+    this.shield.setVisible(false).setActive(false).setAlpha(0.5);
+    (this.shield.body as Phaser.Physics.Arcade.Body).enable = false;
 
     // ally spawn
     const initialGrad = new Grad(this, this.player.x - 80, this.player.y);
@@ -117,7 +133,8 @@ export class GameScene extends Phaser.Scene {
       one: k.addKey(Phaser.Input.Keyboard.KeyCodes.ONE),
       two: k.addKey(Phaser.Input.Keyboard.KeyCodes.TWO),
       three: k.addKey(Phaser.Input.Keyboard.KeyCodes.THREE),
-      q: k.addKey(Phaser.Input.Keyboard.KeyCodes.Q)
+      q: k.addKey(Phaser.Input.Keyboard.KeyCodes.Q),
+      e: k.addKey(Phaser.Input.Keyboard.KeyCodes.E)
     };
 
     // collisions
@@ -139,13 +156,35 @@ export class GameScene extends Phaser.Scene {
         }
       }
     });
-    this.physics.add.overlap(this.enemies, this.player, (e, p) => {
-      const enemy = e as Phaser.Physics.Arcade.Sprite;
-      const player = p as Phaser.Physics.Arcade.Sprite;
-      if (!laneOverlap(enemy.y, player.y, laneBand(player))) return;
-      player.setTint(0xff6666);
-    });
-    this.physics.add.overlap(this.pickups, this.player, (p, pl) => {
+      this.physics.add.overlap(this.enemies, this.player, (e, p) => {
+        const enemy = e as Phaser.Physics.Arcade.Sprite;
+        const player = p as Phaser.Physics.Arcade.Sprite;
+        if (!laneOverlap(enemy.y, player.y, laneBand(player))) return;
+        if (this.shieldActive) return;
+        player.setTint(0xff6666);
+        const hp = (player.getData('hp') as number ?? 10) - 1;
+        player.setData('hp', Math.max(0, hp));
+      });
+      this.physics.add.overlap(this.bullets, this.player, (b, p) => {
+        const bullet = b as Phaser.Physics.Arcade.Sprite;
+        if (bullet.getData('from') !== 'enemy') return;
+        if (this.shieldActive) {
+          this.particlePool.spawn(bullet.x, bullet.y);
+          bullet.destroy();
+          return;
+        }
+        bullet.destroy();
+        const hp = (this.player.getData('hp') as number ?? 10) - 1;
+        this.player.setData('hp', Math.max(0, hp));
+        this.player.setTint(0xff6666);
+      });
+      this.physics.add.overlap(this.bullets, this.shield, (b, s) => {
+        const bullet = b as Phaser.Physics.Arcade.Sprite;
+        if (bullet.getData('from') !== 'enemy') return;
+        this.particlePool.spawn(bullet.x, bullet.y);
+        bullet.destroy();
+      });
+      this.physics.add.overlap(this.pickups, this.player, (p, pl) => {
       const pickup = p as Phaser.Physics.Arcade.Sprite;
       const player = pl as Phaser.Physics.Arcade.Sprite;
       if (!laneOverlap(pickup.y, player.y, laneBand(player))) return;
@@ -161,8 +200,8 @@ export class GameScene extends Phaser.Scene {
       pickup.destroy();
     });
 
-    this.instructionsText = this.add.text(16, 16,
-      'A/D move · W/S lane · Space fire · 1 Retreat 2 Hold 3 Advance', {
+      this.instructionsText = this.add.text(16, 16,
+        'A/D move · W/S lane · Space fire · E shield · 1 Retreat 2 Hold 3 Advance', {
         fontFamily: 'system-ui, Segoe UI, Roboto, Helvetica, Arial',
         color: '#cfe6ff', fontSize: '14px'
       }).setScrollFactor(0);
@@ -212,6 +251,13 @@ export class GameScene extends Phaser.Scene {
       this.allies.forEach(a => a.setCommand('advance'));
     }
     if (Phaser.Input.Keyboard.JustDown(this.keys.q)) this.recruitGrad();
+    if (Phaser.Input.Keyboard.JustDown(this.keys.e) && !this.shieldActive && this.shieldCooldown <= 0) {
+      this.activateShield();
+    }
+    const SHIELD_COOLDOWN_TIME = 5; // seconds
+    if (this.shieldCooldown > 0) {
+      this.shieldCooldown = Math.max(0, this.shieldCooldown - dt / SHIELD_COOLDOWN_TIME);
+    }
 
     // beam charge / cooldown update
     const charge = (this.player.getData('beamCharge') as number) ?? 0;
@@ -253,6 +299,11 @@ export class GameScene extends Phaser.Scene {
       }
     }
     this.updateDepth(this.player);
+    if (this.shieldActive) {
+      this.shield.x = this.player.x;
+      this.shield.y = this.player.y;
+      this.updateDepth(this.shield);
+    }
 
     // update allies after player movement
     this.allies.forEach(a => {
@@ -320,7 +371,21 @@ export class GameScene extends Phaser.Scene {
       bossMaxHp: this.boss ? this.bossMaxHp : 0,
       command: this.currentCommand,
       beamCharge: (this.player.getData('beamCharge') as number) ?? 0,
-      beamCooldown: (this.player.getData('beamCooldown') as number) ?? 0
+      beamCooldown: (this.player.getData('beamCooldown') as number) ?? 0,
+      shieldCooldown: this.shieldCooldown
+    });
+  }
+
+  private activateShield(){
+    this.shieldActive = true;
+    this.shield.setPosition(this.player.x, this.player.y);
+    this.shield.setVisible(true).setActive(true);
+    (this.shield.body as Phaser.Physics.Arcade.Body).enable = true;
+    this.time.delayedCall(2000, () => {
+      this.shieldActive = false;
+      this.shield.setVisible(false).setActive(false);
+      (this.shield.body as Phaser.Physics.Arcade.Body).enable = false;
+      this.shieldCooldown = 1;
     });
   }
 
