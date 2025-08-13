@@ -63,10 +63,13 @@ export class GameScene extends Phaser.Scene {
 
     // collisions
     this.physics.add.overlap(this.bullets, this.enemies, (b, e) => {
-      (b as Phaser.Physics.Arcade.Sprite).destroy();
-      (e as Phaser.Physics.Arcade.Sprite).setTint(0xff6666);
-      (e as any).health = ((e as any).health ?? 5) - 2;
-      if(((e as any).health) <= 0) (e as Phaser.Physics.Arcade.Sprite).destroy();
+      const bullet = b as Phaser.Physics.Arcade.Sprite;
+      const enemy = e as Phaser.Physics.Arcade.Sprite;
+      bullet.destroy();
+      enemy.setTint(0xff6666);
+      const hp = (enemy.getData('hp') ?? 5) - 2;
+      enemy.setData('hp', hp);
+      if (hp <= 0) enemy.destroy();
     });
 
     this.hudText = this.add.text(16, 16, 'A/D move · W/S lane · Space fire', {
@@ -93,7 +96,7 @@ export class GameScene extends Phaser.Scene {
     const y = Phaser.Math.Between(this.lanes.top, this.lanes.bottom);
     const e = this.physics.add.sprite(x, y, 'hr_1');
     e.setImmovable(true);
-    (e as any).health = 5;
+    e.setData('hp', 5);
     e.setDepth(e.y);
     this.enemies.add(e);
   }
@@ -121,9 +124,9 @@ export class GameScene extends Phaser.Scene {
     }
 
     // cull enemies behind
-    this.enemies.children.iterate((e) => {
-      const s = e as Phaser.Physics.Arcade.Sprite;
-      if(!s) return true;
+    this.enemies.children.iterate((obj: Phaser.GameObjects.GameObject) => {
+      const s = obj as Phaser.Physics.Arcade.Sprite;
+      if (!s) return true;
       s.setDepth(s.y);
       if (s.x < this.cameras.main.worldView.x - 200) s.destroy();
       return true;
