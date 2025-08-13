@@ -33,7 +33,7 @@ export class GameScene extends Phaser.Scene {
     this.addParallax();
 
     // player spawn
-    this.player = this.physics.add.sprite(120, this.lanes.bottom, 'player');
+    this.player = this.physics.add.sprite(120, this.lanes.bottom, 'ivan');
     this.player.setCollideWorldBounds(true);
     this.player.setDepth(this.player.y);
 
@@ -65,7 +65,7 @@ export class GameScene extends Phaser.Scene {
     this.physics.add.overlap(this.bullets, this.enemies, (b, e) => {
       (b as Phaser.Physics.Arcade.Sprite).destroy();
       (e as Phaser.Physics.Arcade.Sprite).setTint(0xff6666);
-      (e as Phaser.Physics.Arcade.Sprite).health = ((e as any).health ?? 5) - 2;
+      (e as any).health = ((e as any).health ?? 5) - 2;
       if(((e as any).health) <= 0) (e as Phaser.Physics.Arcade.Sprite).destroy();
     });
 
@@ -91,7 +91,7 @@ export class GameScene extends Phaser.Scene {
 
   private spawnEnemy(x: number){
     const y = Phaser.Math.Between(this.lanes.top, this.lanes.bottom);
-    const e = this.physics.add.sprite(x, y, 'enemy');
+    const e = this.physics.add.sprite(x, y, 'hr_1');
     e.setImmovable(true);
     (e as any).health = 5;
     e.setDepth(e.y);
@@ -114,6 +114,7 @@ export class GameScene extends Phaser.Scene {
     // fire
     if (Phaser.Input.Keyboard.JustDown(this.keys.space)){
       const b = this.physics.add.sprite(this.player.x + (this.player.flipX ? -18 : 18), this.player.y - 10, 'bullet');
+      b.setDisplaySize(10, 4);
       b.setVelocityX(this.player.flipX ? -480 : 480);
       b.setDepth(b.y);
       this.bullets.add(b);
@@ -122,9 +123,10 @@ export class GameScene extends Phaser.Scene {
     // cull enemies behind
     this.enemies.children.iterate((e) => {
       const s = e as Phaser.Physics.Arcade.Sprite;
-      if(!s) return;
+      if(!s) return true;
       s.setDepth(s.y);
       if (s.x < this.cameras.main.worldView.x - 200) s.destroy();
+      return true;
     });
   }
 
