@@ -39,7 +39,7 @@ export class GameScene extends Phaser.Scene {
     // player spawn
     this.player = this.physics.add.sprite(120, LANE_BOTTOM, 'ivan');
     this.player.setCollideWorldBounds(true);
-    this.player.setDepth(this.player.y);
+    this.updateDepth(this.player);
 
     // groups
     this.enemies = this.physics.add.group();
@@ -101,7 +101,7 @@ export class GameScene extends Phaser.Scene {
     const e = this.physics.add.sprite(x, y, 'hr_1');
     e.setImmovable(true);
     e.setData('hp', 5);
-    e.setDepth(e.y);
+    this.updateDepth(e);
     this.enemies.add(e);
   }
 
@@ -132,7 +132,7 @@ export class GameScene extends Phaser.Scene {
         );
       }
     }
-    this.player.setDepth(this.player.y);
+    this.updateDepth(this.player);
 
     // face direction
     this.player.setFlipX(vx < 0);
@@ -142,7 +142,7 @@ export class GameScene extends Phaser.Scene {
       const b = this.physics.add.sprite(this.player.x + (this.player.flipX ? -18 : 18), this.player.y - 10, 'bullet');
       b.setDisplaySize(10, 4);
       b.setVelocityX(this.player.flipX ? -480 : 480);
-      b.setDepth(b.y);
+      this.updateDepth(b);
       this.bullets.add(b);
     }
 
@@ -150,13 +150,25 @@ export class GameScene extends Phaser.Scene {
     this.enemies.children.iterate((obj: Phaser.GameObjects.GameObject) => {
       const s = obj as Phaser.Physics.Arcade.Sprite;
       if (!s) return true;
-      s.setDepth(s.y);
+      this.updateDepth(s);
       if (s.x < this.cameras.main.worldView.x - 200) s.destroy();
+      return true;
+    });
+
+    // update projectile depths
+    this.bullets.children.iterate((obj: Phaser.GameObjects.GameObject) => {
+      const s = obj as Phaser.Physics.Arcade.Sprite;
+      if (!s) return true;
+      this.updateDepth(s);
       return true;
     });
   }
 
   private isDown(...keys: Phaser.Input.Keyboard.Key[]){
     return keys.some(k => k.isDown);
+  }
+
+  private updateDepth(entity: Phaser.GameObjects.Sprite){
+    entity.setDepth(entity.y);
   }
 }
