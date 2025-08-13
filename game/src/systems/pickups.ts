@@ -1,5 +1,7 @@
 import Phaser from 'phaser';
 
+let warned = false;
+
 /** Spawn big pickups along the horizontal path. */
 export function placeBigPickups(
   scene: Phaser.Scene,
@@ -9,11 +11,15 @@ export function placeBigPickups(
   laneTop: number,
   laneBottom: number,
 ) {
+  if (!scene.textures.exists('lettuce') && !warned) {
+    console.warn('[MISSING ASSET] lettuce');
+    warned = true;
+  }
   const spacing = worldWidth / (count + 1);
   for (let i = 1; i <= count; i++) {
     const x = spacing * i;
     const y = Phaser.Math.Between(laneTop, laneBottom);
-    const p = scene.physics.add.sprite(x, y, 'bullet');
+    const p = scene.physics.add.sprite(x, y, 'lettuce');
     p.setScale(1.5);
     p.setData('type', 'big');
     p.setDepth(p.y);
@@ -28,7 +34,11 @@ export function dropSmallLettuce(
   x: number,
   y: number,
 ) {
-  const p = scene.physics.add.sprite(x, y, 'bullet');
+  if (!scene.textures.exists('lettuce') && !warned) {
+    console.warn('[MISSING ASSET] lettuce');
+    warned = true;
+  }
+  const p = scene.physics.add.sprite(x, y, 'lettuce');
   p.setScale(0.5);
   p.setData('type', 'small');
   p.setData('spawn', scene.time.now);

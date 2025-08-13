@@ -16,6 +16,22 @@ export class BootScene extends Phaser.Scene {
       progressBar.fillRect(width / 2 - 150, height / 2 - 15, 300 * value, 30);
     });
 
+    const missing = new Set<string>();
+    const warnMissing = (key: string) => {
+      if (missing.has(key)) return;
+      missing.add(key);
+      console.warn(`[MISSING ASSET] ${key}`);
+    };
+
+    this.load.on('filecomplete', (key: string, type: string) => {
+      if (type === 'image' && !this.textures.exists(key)) warnMissing(key);
+      if (type === 'audio' && !this.cache.audio.has(key)) warnMissing(key);
+    });
+
+    this.load.on('loaderror', (file: Phaser.Loader.File) => {
+      warnMissing(file.key);
+    });
+
     this.load.on('complete', () => {
       progressBar.destroy();
       progressBox.destroy();
@@ -23,17 +39,30 @@ export class BootScene extends Phaser.Scene {
 
     // sprites
     this.load.setPath('assets/sprites');
-    ['ivan','joe','hr_1','boss','bullet'].forEach(name => this.load.image(name, `${name}.png`));
+    [
+      'ivan',
+      'joe',
+      'kellie',
+      'hr_1',
+      'hr_2',
+      'grad_male_1',
+      'grad_male_2',
+      'grad_female_1',
+      'grad_female_2',
+      'lettuce',
+      'office_interior',
+      'bullet'
+    ].forEach(name => this.load.image(name, `${name}.png`));
     this.load.setPath('');
 
     // music
     this.load.setPath('assets/music');
-    ['boss_battle','ivan_game'].forEach(name => this.load.audio(name, `${name}.mp3`));
+    ['ivan_game', 'boss_battle'].forEach(name => this.load.audio(name, `${name}.mp3`));
     this.load.setPath('');
 
     // sfx
     this.load.setPath('assets/sfx');
-    ['beam_charge','beam_fire'].forEach(name => this.load.audio(name, `${name}.mp3`));
+    ['beam_charge', 'beam_fire'].forEach(name => this.load.audio(name, `${name}.mp3`));
     this.load.setPath('');
   }
 

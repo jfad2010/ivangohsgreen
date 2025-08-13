@@ -29,7 +29,7 @@ export class JoJoBoss extends BaseBoss {
     bullets: Phaser.Physics.Arcade.Group,
     spawnDirector?: SpawnDirector,
   ) {
-    super(scene, x, y, 'hr_1', 100);
+    super(scene, x, y, 'joe', 100);
     this.bullets = bullets;
     this.spawnDirector = spawnDirector;
     this.hpBar = scene.add.graphics();

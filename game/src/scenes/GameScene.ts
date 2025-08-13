@@ -17,6 +17,8 @@ const LANE_TOP = 360;
 const LANE_BOTTOM = 520;
 const LANE_SOFT_SNAP = 0.12;
 const LANE_SOFT_ZONE = 10;
+export const BGM_VOL = 0.5;
+export const SFX_VOL = 1;
 
 type Keys = {
   up: Phaser.Input.Keyboard.Key;
@@ -62,14 +64,87 @@ export class GameScene extends Phaser.Scene {
   private shield!: Phaser.Physics.Arcade.Sprite;
   private shieldActive = false;
   private shieldCooldown = 0;
+  private bg!: Phaser.GameObjects.TileSprite;
+  private musicMain?: Phaser.Sound.BaseSound;
+  private musicBoss?: Phaser.Sound.BaseSound;
+  private bossMusic = false;
+  private sfxCharge?: Phaser.Sound.BaseSound;
+  private sfxFire?: Phaser.Sound.BaseSound;
+  private gradKeys = ['grad_male_1','grad_female_1','grad_male_2','grad_female_2'];
+  private gradIndex = 0;
+  private hrAlt = 0;
+  private missing = new Set<string>();
 
   constructor(){ super('game'); }
+
+  private warnMissing(key: string){
+    if (this.missing.has(key)) return;
+    this.missing.add(key);
+    console.warn(`[MISSING ASSET] ${key}`);
+  }
+
+  private nextGradKey(){
+    const key = this.gradKeys[this.gradIndex % this.gradKeys.length];
+    this.gradIndex++;
+    return key;
+  }
+
+  private spawnGrad(x: number, y: number){
+    const key = this.nextGradKey();
+    const color = key.includes('female') ? 0xff66cc : 0x66ccff;
+    const grad = new Grad(this, x, y, key, 1, color);
+    if (!this.textures.exists(key)) this.warnMissing(key);
+    grad.setDepth(grad.y);
+    return grad;
+  }
+
+  private fadeToBoss(){
+    if (!this.musicBoss) return;
+    if (this.musicMain && this.musicMain.isPlaying) {
+      this.tweens.add({ targets: this.musicMain, volume: 0, duration: 1000, onComplete: () => this.musicMain?.stop() });
+    }
+    if (!this.musicBoss.isPlaying) this.musicBoss.play();
+    this.tweens.add({ targets: this.musicBoss, volume: BGM_VOL, duration: 1000 });
+    this.bossMusic = true;
+  }
+
+  private fadeToMain(){
+    if (!this.musicMain) return;
+    if (this.musicBoss && this.musicBoss.isPlaying) {
+      this.tweens.add({ targets: this.musicBoss, volume: 0, duration: 1000, onComplete: () => this.musicBoss?.stop() });
+    }
+    if (!this.musicMain.isPlaying) this.musicMain.play();
+    this.tweens.add({ targets: this.musicMain, volume: BGM_VOL, duration: 1000 });
+    this.bossMusic = false;
+  }
 
   create(){
     // world bounds and camera
     this.cameras.main.setBackgroundColor('#0b0d12');
     this.physics.world.setBounds(0, 0, this.worldWidth, 576);
     this.addParallax();
+
+    if (this.cache.audio.has('ivan_game')) {
+      this.musicMain = this.sound.add('ivan_game', { loop: true, volume: BGM_VOL });
+      this.musicMain.play();
+    } else {
+      this.warnMissing('ivan_game');
+    }
+    if (this.cache.audio.has('boss_battle')) {
+      this.musicBoss = this.sound.add('boss_battle', { loop: true, volume: 0 });
+    } else {
+      this.warnMissing('boss_battle');
+    }
+    if (this.cache.audio.has('beam_charge')) {
+      this.sfxCharge = this.sound.add('beam_charge');
+    } else {
+      this.warnMissing('beam_charge');
+    }
+    if (this.cache.audio.has('beam_fire')) {
+      this.sfxFire = this.sound.add('beam_fire');
+    } else {
+      this.warnMissing('beam_fire');
+    }
 
     // create shield texture
     const shieldG = this.add.graphics();
@@ -79,6 +154,7 @@ export class GameScene extends Phaser.Scene {
 
     // player spawn
     this.player = this.physics.add.sprite(120, LANE_BOTTOM, 'ivan');
+    if (!this.textures.exists('ivan')) this.warnMissing('ivan');
     this.player.setCollideWorldBounds(true);
     this.player.setDepth(this.player.y);
     this.player.setData('size', 'M');
@@ -93,8 +169,7 @@ export class GameScene extends Phaser.Scene {
     (this.shield.body as Phaser.Physics.Arcade.Body).enable = false;
 
     // ally spawn
-    const initialGrad = new Grad(this, this.player.x - 80, this.player.y);
-    initialGrad.setDepth(initialGrad.y);
+    const initialGrad = this.spawnGrad(this.player.x - 80, this.player.y);
     this.allies = [initialGrad];
 
     // groups
@@ -116,7 +191,9 @@ export class GameScene extends Phaser.Scene {
     this.boss = new JoJoBoss(this, 2400, LANE_BOTTOM, this.bullets, this.spawnDirector);
     this.boss.setDepth(this.boss.y);
     this.enemies.add(this.boss);
+    this.boss.on('onDefeated', () => this.fadeToMain());
     this.bossMaxHp = this.boss.hp;
+    if (!this.textures.exists('joe')) this.warnMissing('joe');
 
     // camera follows
     this.cameras.main.startFollow(this.player, true, 0.08, 0.08, -200, 120);
@@ -234,16 +311,18 @@ export class GameScene extends Phaser.Scene {
   }
 
   private addParallax(){
-    // simple strip background
-    const g = this.add.graphics().setScrollFactor(0);
-    g.fillStyle(0x101318, 1).fillRect(0, 0, 1024, 576);
-    // horizon
-    g.fillStyle(0x121a27, 1).fillRect(0, 420, 1024, 156);
+    this.bg = this.add.tileSprite(0, 0, this.scale.width, this.scale.height, 'office_interior')
+      .setOrigin(0)
+      .setScrollFactor(0)
+      .setDepth(-1000);
+    if (!this.textures.exists('office_interior')) this.warnMissing('office_interior');
   }
 
   private spawnEnemy(x: number, y?: number){
     const yy = y !== undefined ? y : Phaser.Math.Between(LANE_TOP, LANE_BOTTOM);
-    const e = this.physics.add.sprite(x, yy, 'hr_1');
+    const key = this.hrAlt++ % 2 === 0 ? 'hr_1' : 'hr_2';
+    if (!this.textures.exists(key)) this.warnMissing(key);
+    const e = this.physics.add.sprite(x, yy, key);
     e.setImmovable(true);
     e.setData('hp', 5);
     e.setData('size', 'M');
@@ -275,6 +354,10 @@ export class GameScene extends Phaser.Scene {
 
   update(time: number, delta: number){
     const dt = delta/1000;
+    this.bg.tilePositionX = this.cameras.main.scrollX * 0.3;
+    if (this.boss && !this.bossMusic && this.player.x > this.boss.x - 300) {
+      this.fadeToBoss();
+    }
 
     // formation scheduling
     const output = this.spawnDirector.update({
@@ -379,6 +462,7 @@ export class GameScene extends Phaser.Scene {
 
     // fire
     if (Phaser.Input.Keyboard.JustDown(this.keys.space)){
+      if (this.sfxCharge && !this.sfxCharge.isPlaying) this.sfxCharge.play({ volume: SFX_VOL });
       const b = this.projectilePool.fire(
         this.player.x + (this.player.flipX ? -18 : 18),
         this.player.y - 10,
@@ -392,6 +476,9 @@ export class GameScene extends Phaser.Scene {
         this.player.setData('beamCharge', 0);
         this.player.setData('beamCooldown', 1);
       }
+    }
+    if (Phaser.Input.Keyboard.JustUp(this.keys.space)) {
+      if (this.sfxFire && !this.sfxFire.isPlaying) this.sfxFire.play({ volume: SFX_VOL });
     }
 
     // beam damage
@@ -463,8 +550,7 @@ export class GameScene extends Phaser.Scene {
   private recruitGrad(){
     if (this.lettuce >= this.recruitCost) {
       this.lettuce -= this.recruitCost;
-      const g = new Grad(this, this.player.x - 80, this.player.y);
-      g.setDepth(g.y);
+      const g = this.spawnGrad(this.player.x - 80, this.player.y);
       this.allies.push(g);
       // HUD updates automatically
     } else {
