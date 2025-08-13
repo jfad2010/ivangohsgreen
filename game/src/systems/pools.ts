@@ -34,6 +34,7 @@ export function createProjectilePool(
     if (!b) return null;
     b.enableBody(true, x, y, true, true);
     b.setVelocityX(vx);
+    b.setData('from', 'player');
     return b;
   }
 
