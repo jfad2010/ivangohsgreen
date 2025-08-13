@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { laneBand, laneOverlap, projectileHitsEnemy } from '../systems/collision';
 import { JoJoBoss } from '../entities/boss/JoJoBoss';
+import { Grad } from '../entities/ally/Grad';
 
 const LANE_TOP = 360;
 const LANE_BOTTOM = 520;
@@ -17,6 +18,9 @@ type Keys = {
   s: Phaser.Input.Keyboard.Key;
   d: Phaser.Input.Keyboard.Key;
   space: Phaser.Input.Keyboard.Key;
+  one: Phaser.Input.Keyboard.Key;
+  two: Phaser.Input.Keyboard.Key;
+  three: Phaser.Input.Keyboard.Key;
 };
 
 export class GameScene extends Phaser.Scene {
@@ -29,6 +33,8 @@ export class GameScene extends Phaser.Scene {
   private bullets!: Phaser.Physics.Arcade.Group;
   private pickups!: Phaser.Physics.Arcade.Group;
   private boss?: JoJoBoss;
+
+  private ally!: Grad;
 
   private hudText!: Phaser.GameObjects.Text;
 
@@ -45,6 +51,10 @@ export class GameScene extends Phaser.Scene {
     this.player.setCollideWorldBounds(true);
     this.player.setDepth(this.player.y);
     this.player.setData('size', 'M');
+
+    // ally spawn
+    this.ally = new Grad(this, this.player.x - 80, this.player.y);
+    this.ally.setDepth(this.ally.y);
 
     // groups
     this.enemies = this.physics.add.group();
@@ -73,7 +83,10 @@ export class GameScene extends Phaser.Scene {
       a: k.addKey(Phaser.Input.Keyboard.KeyCodes.A),
       s: k.addKey(Phaser.Input.Keyboard.KeyCodes.S),
       d: k.addKey(Phaser.Input.Keyboard.KeyCodes.D),
-      space: k.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE)
+      space: k.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE),
+      one: k.addKey(Phaser.Input.Keyboard.KeyCodes.ONE),
+      two: k.addKey(Phaser.Input.Keyboard.KeyCodes.TWO),
+      three: k.addKey(Phaser.Input.Keyboard.KeyCodes.THREE)
     };
 
     // collisions
@@ -104,7 +117,7 @@ export class GameScene extends Phaser.Scene {
       pickup.destroy();
     });
 
-    this.hudText = this.add.text(16, 16, 'A/D move · W/S lane · Space fire', {
+    this.hudText = this.add.text(16, 16, 'A/D move · W/S lane · Space fire · 1 Retreat 2 Hold 3 Advance', {
       fontFamily: 'system-ui, Segoe UI, Roboto, Helvetica, Arial',
       color: '#cfe6ff', fontSize: '14px'
     }).setScrollFactor(0);
@@ -138,6 +151,11 @@ export class GameScene extends Phaser.Scene {
   update(time: number, delta: number){
     const dt = delta/1000;
 
+    // ally command input
+    if (Phaser.Input.Keyboard.JustDown(this.keys.one)) this.ally.setCommand('retreat');
+    if (Phaser.Input.Keyboard.JustDown(this.keys.two)) this.ally.setCommand('hold');
+    if (Phaser.Input.Keyboard.JustDown(this.keys.three)) this.ally.setCommand('advance');
+
     // movement (belt scroller: allow y within band, x scroll)
     const vx = (this.isDown(this.keys.d, this.keys.right) ? 1 : 0) - (this.isDown(this.keys.a, this.keys.left) ? 1 : 0);
     const vy = (this.isDown(this.keys.s, this.keys.down) ? 1 : 0) - (this.isDown(this.keys.w, this.keys.up) ? 1 : 0);
@@ -163,6 +181,10 @@ export class GameScene extends Phaser.Scene {
       }
     }
     this.updateDepth(this.player);
+
+    // update ally after player movement
+    this.ally.update(dt, this.player);
+    this.updateDepth(this.ally);
 
     // face direction
     this.player.setFlipX(vx < 0);
