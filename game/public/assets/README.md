@@ -6,6 +6,8 @@ Placeholder directory for game assets.
 - `ivan.png`
 - `joe.png`
 - `hr_1.png`
+- `boss.png`
+- `bullet.png`
 
 ## Music
 - `ivan_game.mp3`

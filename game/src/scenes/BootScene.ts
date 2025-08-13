@@ -4,30 +4,37 @@ export class BootScene extends Phaser.Scene {
   constructor(){ super('boot'); }
 
   preload(){
-    // Generate minimal textures at runtime
-    const g = this.add.graphics();
+    const { width, height } = this.cameras.main;
+    const progressBox = this.add.graphics();
+    const progressBar = this.add.graphics();
+    progressBox.fillStyle(0x222222, 0.8);
+    progressBox.fillRect(width / 2 - 160, height / 2 - 25, 320, 50);
 
-    // player
-    g.clear().fillStyle(0x5bd1ff).fillRect(0,0,28,44);
-    g.generateTexture('player', 28, 44);
+    this.load.on('progress', (value: number) => {
+      progressBar.clear();
+      progressBar.fillStyle(0xffffff, 1);
+      progressBar.fillRect(width / 2 - 150, height / 2 - 15, 300 * value, 30);
+    });
 
-    // ally
-    g.clear().fillStyle(0x52ff9a).fillRect(0,0,26,40);
-    g.generateTexture('ally', 26, 40);
+    this.load.on('complete', () => {
+      progressBar.destroy();
+      progressBox.destroy();
+    });
 
-    // enemy
-    g.clear().fillStyle(0xff9a2f).fillRect(0,0,26,40);
-    g.generateTexture('enemy', 26, 40);
+    // sprites
+    this.load.setPath('assets/sprites');
+    ['ivan','joe','hr_1','boss','bullet'].forEach(name => this.load.image(name, `${name}.png`));
+    this.load.setPath('');
 
-    // boss
-    g.clear().fillStyle(0xff4d4d).fillRect(0,0,80,140);
-    g.generateTexture('boss', 80, 140);
+    // music
+    this.load.setPath('assets/music');
+    ['boss_battle','ivan_game'].forEach(name => this.load.audio(name, `${name}.mp3`));
+    this.load.setPath('');
 
-    // bullet
-    g.clear().fillStyle(0xffffff).fillRect(0,0,10,4);
-    g.generateTexture('bullet', 10, 4);
-
-    g.destroy();
+    // sfx
+    this.load.setPath('assets/sfx');
+    ['beam_charge','beam_fire'].forEach(name => this.load.audio(name, `${name}.mp3`));
+    this.load.setPath('');
   }
 
   create(){

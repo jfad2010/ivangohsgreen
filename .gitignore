@@ -13,3 +13,7 @@ build
 .next
 .vercel
 .DS_Store
+
+# game assets
+game/public/assets/**/*.png
+game/public/assets/**/*.mp3
