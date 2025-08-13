@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { BaseBoss } from './BaseBoss';
+import { SpawnDirector } from '../../systems/spawnDirector';
 
 // Boss phases
 enum Phase {
@@ -19,15 +20,18 @@ export class JoJoBoss extends BaseBoss {
   private maxHp = 100;
   private bullets: Phaser.Physics.Arcade.Group;
   private hpBar: Phaser.GameObjects.Graphics;
+  private spawnDirector?: SpawnDirector;
 
   constructor(
     scene: Phaser.Scene,
     x: number,
     y: number,
     bullets: Phaser.Physics.Arcade.Group,
+    spawnDirector?: SpawnDirector,
   ) {
     super(scene, x, y, 'hr_1', 100);
     this.bullets = bullets;
+    this.spawnDirector = spawnDirector;
     this.hpBar = scene.add.graphics();
     this.setImmovable(true);
 
@@ -43,6 +47,10 @@ export class JoJoBoss extends BaseBoss {
     super.preUpdate(time, delta);
     this.checkEnrage();
     this.drawHpBar();
+    if (this.spawnDirector?.consumeVolleyWindow()) {
+      console.log('JoJo consumes volley window');
+      this.forceVolley();
+    }
   }
 
   private checkEnrage() {
@@ -50,6 +58,13 @@ export class JoJoBoss extends BaseBoss {
     if (!this.enraged && hp <= this.maxHp * 0.3) {
       this.enraged = true;
       console.log('JoJo enraged!');
+    }
+  }
+
+  private forceVolley() {
+    if (this.phaseTimer) this.phaseTimer.remove(false);
+    if (this.phase !== Phase.VOLLEY) {
+      this.startPhase(Phase.VOLLEY);
     }
   }
 
