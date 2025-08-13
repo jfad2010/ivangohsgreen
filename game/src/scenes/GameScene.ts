@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { DummyBoss } from '../entities/boss/DummyBoss';
+import { laneBand, laneOverlap } from '../systems/collision';
 
 const LANE_TOP = 360;
 const LANE_BOTTOM = 520;
@@ -26,6 +27,7 @@ export class GameScene extends Phaser.Scene {
 
   private enemies!: Phaser.Physics.Arcade.Group;
   private bullets!: Phaser.Physics.Arcade.Group;
+  private pickups!: Phaser.Physics.Arcade.Group;
 
   private boss!: DummyBoss;
 
@@ -42,11 +44,13 @@ export class GameScene extends Phaser.Scene {
     // player spawn
     this.player = this.physics.add.sprite(120, LANE_BOTTOM, 'ivan');
     this.player.setCollideWorldBounds(true);
-    this.updateDepth(this.player);
+    this.player.setDepth(this.player.y);
+    this.player.setData('size', 'M');
 
     // groups
     this.enemies = this.physics.add.group();
     this.bullets = this.physics.add.group();
+    this.pickups = this.physics.add.group();
 
     // dummy boss
     this.boss = new DummyBoss(this, 1000, LANE_TOP);
@@ -80,11 +84,24 @@ export class GameScene extends Phaser.Scene {
     this.physics.add.overlap(this.bullets, this.enemies, (b, e) => {
       const bullet = b as Phaser.Physics.Arcade.Sprite;
       const enemy = e as Phaser.Physics.Arcade.Sprite;
+      if (!laneOverlap(bullet.y, enemy.y, laneBand(enemy))) return;
       bullet.destroy();
       enemy.setTint(0xff6666);
       const hp = (enemy.getData('hp') ?? 5) - 2;
       enemy.setData('hp', hp);
       if (hp <= 0) enemy.destroy();
+    });
+    this.physics.add.overlap(this.enemies, this.player, (e, p) => {
+      const enemy = e as Phaser.Physics.Arcade.Sprite;
+      const player = p as Phaser.Physics.Arcade.Sprite;
+      if (!laneOverlap(enemy.y, player.y, laneBand(player))) return;
+      player.setTint(0xff6666);
+    });
+    this.physics.add.overlap(this.pickups, this.player, (p, pl) => {
+      const pickup = p as Phaser.Physics.Arcade.Sprite;
+      const player = pl as Phaser.Physics.Arcade.Sprite;
+      if (!laneOverlap(pickup.y, player.y, laneBand(player))) return;
+      pickup.destroy();
     });
 
     this.hudText = this.add.text(16, 16, 'A/D move · W/S lane · Space fire', {
@@ -112,7 +129,9 @@ export class GameScene extends Phaser.Scene {
     const e = this.physics.add.sprite(x, y, 'hr_1');
     e.setImmovable(true);
     e.setData('hp', 5);
-    this.updateDepth(e);
+    e.setData('size', 'M');
+    e.setDepth(e.y);
+
     this.enemies.add(e);
   }
 
