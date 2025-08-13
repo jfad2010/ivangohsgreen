@@ -1,5 +1,11 @@
 import Phaser from 'phaser';
 import { laneBand, laneOverlap, projectileHitsEnemy } from '../systems/collision';
+import {
+  createParticlePool,
+  createProjectilePool,
+  ParticlePool,
+  ProjectilePool
+} from '../systems/pools';
 import { JoJoBoss } from '../entities/boss/JoJoBoss';
 import { Grad, GradCommand } from '../entities/ally/Grad';
 import HUD from '../ui/hud';
@@ -35,6 +41,8 @@ export class GameScene extends Phaser.Scene {
   private enemies!: Phaser.Physics.Arcade.Group;
   private bullets!: Phaser.Physics.Arcade.Group;
   private pickups!: Phaser.Physics.Arcade.Group;
+  private projectilePool!: ProjectilePool;
+  private particlePool!: ParticlePool;
   private boss?: JoJoBoss;
 
   private allies!: Grad[];
@@ -46,6 +54,7 @@ export class GameScene extends Phaser.Scene {
   private hud!: HUD;
   private currentCommand: GradCommand = 'hold';
   private bossMaxHp = 0;
+  private depthUpdater = (s: Phaser.GameObjects.Sprite) => this.updateDepth(s);
 
   constructor(){ super('game'); }
 
@@ -73,6 +82,10 @@ export class GameScene extends Phaser.Scene {
     this.enemies = this.physics.add.group();
     this.bullets = this.physics.add.group();
     this.pickups = this.physics.add.group();
+
+    // pools
+    this.projectilePool = createProjectilePool(this, this.bullets, 'bullet', 200);
+    this.particlePool = createParticlePool(this, 'bullet', 100, 0.3);
 
     // big pickups along path
     placeBigPickups(this, this.pickups, this.worldWidth, 8, LANE_TOP, LANE_BOTTOM);
@@ -112,7 +125,8 @@ export class GameScene extends Phaser.Scene {
       const bullet = b as Phaser.Physics.Arcade.Sprite;
       const enemy = e as Phaser.Physics.Arcade.Sprite & { takeDamage?: (n: number) => void };
       if (!projectileHitsEnemy(bullet, enemy)) return;
-      bullet.destroy();
+      this.projectilePool.release(bullet);
+      this.particlePool.spawn(bullet.x, bullet.y);
       enemy.setTint(0xff6666);
       if (typeof enemy.takeDamage === 'function') {
         enemy.takeDamage(2);
@@ -251,11 +265,15 @@ export class GameScene extends Phaser.Scene {
 
     // fire
     if (Phaser.Input.Keyboard.JustDown(this.keys.space)){
-      const b = this.physics.add.sprite(this.player.x + (this.player.flipX ? -18 : 18), this.player.y - 10, 'bullet');
-      b.setDisplaySize(10, 4);
-      b.setVelocityX(this.player.flipX ? -480 : 480);
-      this.updateDepth(b);
-      this.bullets.add(b);
+      const b = this.projectilePool.fire(
+        this.player.x + (this.player.flipX ? -18 : 18),
+        this.player.y - 10,
+        this.player.flipX ? -480 : 480
+      );
+      if (b) {
+        b.setDisplaySize(10, 4);
+        this.updateDepth(b);
+      }
       if ((this.player.getData('beamCharge') as number ?? 0) >= 1 && (this.player.getData('beamCooldown') as number ?? 0) <= 0) {
         this.player.setData('beamCharge', 0);
         this.player.setData('beamCooldown', 1);
@@ -291,13 +309,9 @@ export class GameScene extends Phaser.Scene {
       return true;
     });
 
-    // update projectile depths
-    this.bullets.children.iterate((obj: Phaser.GameObjects.GameObject) => {
-      const s = obj as Phaser.Physics.Arcade.Sprite;
-      if (!s) return true;
-      this.updateDepth(s);
-      return true;
-    });
+    // update projectiles and particles
+    this.projectilePool.update(this.cameras.main, this.depthUpdater);
+    this.particlePool.update(dt);
     this.hud.update(dt, {
       lettuce: this.lettuce,
       grads: this.allies.length,
