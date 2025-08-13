@@ -142,18 +142,38 @@ export class GameScene extends Phaser.Scene {
       const bullet = b as Phaser.Physics.Arcade.Sprite;
       const enemy = e as Phaser.Physics.Arcade.Sprite & { takeDamage?: (n: number) => void };
       if (!projectileHitsEnemy(bullet, enemy)) return;
-      this.projectilePool.release(bullet);
       this.particlePool.spawn(bullet.x, bullet.y);
       enemy.setTint(0xff6666);
+
+      const dmg = bullet.getData('damage') ?? 2;
+      let killed = false;
+
       if (typeof enemy.takeDamage === 'function') {
-        enemy.takeDamage(2);
+        const boss = enemy as any;
+        enemy.takeDamage(dmg);
+        if (typeof boss.hp === 'number' && boss.hp <= 0) {
+          killed = true;
+        }
       } else {
-        const hp = (enemy.getData('hp') ?? 5) - 2;
+        const hp = (enemy.getData('hp') ?? 5) - dmg;
         enemy.setData('hp', hp);
         if (hp <= 0) {
           dropSmallLettuce(this, this.pickups, enemy.x, enemy.y);
           enemy.destroy();
+          killed = true;
         }
+      }
+
+      if (killed) {
+        const owner = bullet.getData('owner') as Grad | undefined;
+        owner?.registerKill();
+      }
+
+      const pierce = bullet.getData('pierce') ?? 1;
+      if (pierce > 1) {
+        bullet.setData('pierce', pierce - 1);
+      } else {
+        this.projectilePool.release(bullet);
       }
     });
       this.physics.add.overlap(this.enemies, this.player, (e, p) => {
@@ -305,10 +325,22 @@ export class GameScene extends Phaser.Scene {
       this.updateDepth(this.shield);
     }
 
-    // update allies after player movement
+    // update allies after player movement and handle firing
     this.allies.forEach(a => {
       a.update(dt, this.player);
       this.updateDepth(a);
+      if (a.readyToFire()) {
+        const b = this.projectilePool.fire(a.x + 18, a.y - 10, 480);
+        if (b) {
+          b.setData('from', 'ally');
+          b.setData('owner', a);
+          b.setData('damage', a.damage);
+          b.setData('pierce', a.pierce);
+          b.setDisplaySize(10, 4);
+          this.updateDepth(b);
+        }
+        a.recordShot();
+      }
     });
 
     // face direction

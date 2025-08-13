@@ -20,7 +20,7 @@ export function createNameplate(scene: Phaser.Scene, text: string) {
   return nameplate;
 }
 
-const LEVEL_TITLES = ['', 'Rookie', 'Veteran', 'Elite', 'Legend'];
+const LEVEL_TITLES = ['', 'Rookie', 'Veteran', 'Elite', 'Legend', 'Mythic'];
 
 export function titleByLevel(level: number): string {
   return LEVEL_TITLES[level] ?? '';

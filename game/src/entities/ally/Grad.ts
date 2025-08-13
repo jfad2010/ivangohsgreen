@@ -16,6 +16,11 @@ export class Grad extends Phaser.Physics.Arcade.Sprite {
   level: number;
   aura: Phaser.GameObjects.Arc;
   nameplate: Phaser.GameObjects.Text;
+  kills: number;
+  fireTimer: number;
+  fireCooldown: number;
+  damage: number;
+  pierce: number;
 
   constructor(scene: Phaser.Scene, x: number, y: number, level = 1) {
     super(scene, x, y, 'joe');
@@ -37,6 +42,13 @@ export class Grad extends Phaser.Physics.Arcade.Sprite {
     const text = title ? `Grad - ${title}` : 'Grad';
     this.nameplate = createNameplate(scene, text);
 
+    this.kills = 0;
+    this.fireTimer = 0;
+    this.fireCooldown = 0.8;
+    this.damage = 2;
+    this.pierce = 1;
+    this.updateStats();
+
     this.setData('size', 'M');
   }
 
@@ -50,6 +62,7 @@ export class Grad extends Phaser.Physics.Arcade.Sprite {
     const alpha = Math.min(1, 0.2 + level * 0.1);
     this.aura.setRadius(radius);
     this.aura.setFillStyle(this.aura.fillColor, alpha);
+    this.updateStats();
   }
 
   setCommand(cmd: GradCommand) {
@@ -59,6 +72,9 @@ export class Grad extends Phaser.Physics.Arcade.Sprite {
   update(dt: number, player: Phaser.Physics.Arcade.Sprite) {
     // regen
     this.hp = Math.min(this.maxHp, this.hp + this.regen * dt);
+
+    // firing cooldown
+    this.fireTimer = Math.max(0, this.fireTimer - dt);
 
     // follow player's lane
     this.y = player.y;
@@ -98,6 +114,30 @@ export class Grad extends Phaser.Physics.Arcade.Sprite {
     this.aura.setDepth(this.depth - 1);
     this.nameplate.setPosition(this.x, this.y - this.height);
     this.nameplate.setDepth(this.depth + 1);
+  }
+
+  readyToFire() {
+    return this.fireTimer <= 0;
+  }
+
+  recordShot() {
+    this.fireTimer = this.fireCooldown;
+  }
+
+  registerKill() {
+    this.kills += 1;
+    const thresholds = [3, 8, 18, 35];
+    const nextLevel = this.level + 1;
+    const idx = nextLevel - 2;
+    if (idx >= 0 && idx < thresholds.length && this.kills >= thresholds[idx]) {
+      this.setLevel(nextLevel);
+    }
+  }
+
+  private updateStats() {
+    this.damage = 2 + (this.level - 1);
+    this.fireCooldown = Math.max(0.3, 0.8 - 0.1 * (this.level - 1));
+    this.pierce = 1 + Math.floor((this.level - 1) / 2);
   }
 }
 
