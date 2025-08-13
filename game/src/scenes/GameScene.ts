@@ -10,6 +10,8 @@ import { JoJoBoss } from '../entities/boss/JoJoBoss';
 import { Grad, GradCommand } from '../entities/ally/Grad';
 import HUD from '../ui/hud';
 import { placeBigPickups, dropSmallLettuce, updatePickups } from '../systems/pickups';
+import { SpawnDirector, FormationWave } from '../systems/spawnDirector';
+import formationConfig from '../config/formations/default.json';
 
 const LANE_TOP = 360;
 const LANE_BOTTOM = 520;
@@ -45,6 +47,7 @@ export class GameScene extends Phaser.Scene {
   private projectilePool!: ProjectilePool;
   private particlePool!: ParticlePool;
   private boss?: JoJoBoss;
+  private spawnDirector!: SpawnDirector;
 
   private allies!: Grad[];
   private lettuce = 5;
@@ -106,11 +109,11 @@ export class GameScene extends Phaser.Scene {
     // big pickups along path
     placeBigPickups(this, this.pickups, this.worldWidth, 8, LANE_TOP, LANE_BOTTOM);
 
-    // spawn a few enemies to start
-    for(let i=0;i<20;i++) this.spawnEnemy(600 + i*180 + Phaser.Math.Between(-40,40));
+    // formation-based spawns
+    this.spawnDirector = new SpawnDirector((formationConfig as { waves: FormationWave[] }).waves);
 
     // boss spawn
-    this.boss = new JoJoBoss(this, 2400, LANE_BOTTOM, this.bullets);
+    this.boss = new JoJoBoss(this, 2400, LANE_BOTTOM, this.bullets, this.spawnDirector);
     this.boss.setDepth(this.boss.y);
     this.enemies.add(this.boss);
     this.bossMaxHp = this.boss.hp;
@@ -228,11 +231,6 @@ export class GameScene extends Phaser.Scene {
 
     this.hud = new HUD(this);
 
-    // timed enemy spawns
-    this.time.addEvent({ delay: 1500, loop: true, callback: () => {
-      const x = Math.min(this.player.x + 900, this.worldWidth - 200);
-      this.spawnEnemy(x + Phaser.Math.Between(-60, 60));
-    }});
   }
 
   private addParallax(){
@@ -243,9 +241,9 @@ export class GameScene extends Phaser.Scene {
     g.fillStyle(0x121a27, 1).fillRect(0, 420, 1024, 156);
   }
 
-  private spawnEnemy(x: number){
-    const y = Phaser.Math.Between(LANE_TOP, LANE_BOTTOM);
-    const e = this.physics.add.sprite(x, y, 'hr_1');
+  private spawnEnemy(x: number, y?: number){
+    const yy = y !== undefined ? y : Phaser.Math.Between(LANE_TOP, LANE_BOTTOM);
+    const e = this.physics.add.sprite(x, yy, 'hr_1');
     e.setImmovable(true);
     e.setData('hp', 5);
     e.setData('size', 'M');
@@ -254,8 +252,41 @@ export class GameScene extends Phaser.Scene {
     this.enemies.add(e);
   }
 
+  private spawnFormation(wave: FormationWave, baseX: number){
+    const laneY = wave.lane === 'top' ? LANE_TOP : LANE_BOTTOM;
+    if (wave.pattern === 'line') {
+      const spacing = wave.spacing ?? 60;
+      for (let i = 0; i < wave.count; i++) {
+        this.spawnEnemy(baseX + i * spacing, laneY);
+      }
+    } else if (wave.pattern === 'arc') {
+      const radius = wave.radius ?? 60;
+      for (let i = 0; i < wave.count; i++) {
+        const t = wave.count === 1 ? 0.5 : i / (wave.count - 1);
+        const theta = Math.PI * t;
+        const x = baseX + Math.cos(theta) * radius;
+        const y = wave.lane === 'top'
+          ? laneY + Math.sin(theta) * radius
+          : laneY - Math.sin(theta) * radius;
+        this.spawnEnemy(x, y);
+      }
+    }
+  }
+
   update(time: number, delta: number){
     const dt = delta/1000;
+
+    // formation scheduling
+    const output = this.spawnDirector.update({
+      dt,
+      progress: this.player.x / this.worldWidth,
+      grads: this.allies.length,
+      difficulty: 1,
+      enemyCount: this.enemies.getChildren().length,
+      nearBoss: this.boss ? Math.abs(this.boss.x - this.player.x) < 400 : false,
+    });
+    const baseX = Math.min(this.player.x + 900, this.worldWidth - 200);
+    output.waves.forEach(w => this.spawnFormation(w, baseX));
 
     // ally command input
     if (Phaser.Input.Keyboard.JustDown(this.keys.one)) {

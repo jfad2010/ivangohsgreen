@@ -1,0 +1,7 @@
+{
+  "waves": [
+    { "time": 2, "type": "hr_1", "lane": "top", "pattern": "line", "count": 3, "spacing": 60 },
+    { "time": 6, "type": "hr_1", "lane": "bottom", "pattern": "arc", "count": 5, "radius": 80 },
+    { "time": 12, "type": "hr_1", "lane": "top", "pattern": "line", "count": 6, "spacing": 50 }
+  ]
+}
