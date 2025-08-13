@@ -1,22 +1,41 @@
 import { NextResponse } from 'next/server';
-import { sql } from '@/lib/db';
+import { z } from 'zod';
+import { sql } from '../../../lib/db';
 
-export async function GET(req: Request){
+const ProfileQuerySchema = z.object({
+  userId: z.string().uuid(),
+});
+
+const ProfileSchema = z.object({
+  userId: z.string().uuid(),
+  handle: z.string().nullable().optional(),
+  unlocked_levels: z.array(z.string()).default([]),
+  upgrades: z.record(z.unknown()).default({}),
+});
+
+export async function GET(req: Request) {
   const url = new URL(req.url);
-  const userId = url.searchParams.get('userId');
-  if(!userId) return NextResponse.json({ ok:false, error:'userId required' }, { status:400 });
-  try{
+  const parsed = ProfileQuerySchema.safeParse(Object.fromEntries(url.searchParams));
+  if (!parsed.success) {
+    return NextResponse.json({ ok: false, error: 'userId required' }, { status: 400 });
+  }
+  const { userId } = parsed.data;
+  try {
     const rows = await sql`SELECT user_id, handle, unlocked_levels, upgrades, updated_at FROM profiles WHERE user_id = ${userId}`;
-    return NextResponse.json({ ok:true, row: rows[0] ?? null });
-  }catch(err:any){
-    return NextResponse.json({ ok:false, error: err?.message ?? 'error' }, { status:500 });
+    return NextResponse.json({ ok: true, data: rows[0] ?? null });
+  } catch (err: any) {
+    return NextResponse.json({ ok: false, error: err?.message ?? 'error' }, { status: 500 });
   }
 }
 
-export async function POST(req: Request){
-  try{
-    const { userId, handle = null, unlocked_levels = [], upgrades = {} } = await req.json();
-    if(!userId) return NextResponse.json({ ok:false, error:'userId required' }, { status:400 });
+export async function POST(req: Request) {
+  try {
+    const body = await req.json();
+    const parsed = ProfileSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ ok: false, error: 'invalid payload' }, { status: 400 });
+    }
+    const { userId, handle = null, unlocked_levels = [], upgrades = {} } = parsed.data;
     await sql`
       INSERT INTO profiles (user_id, handle, unlocked_levels, upgrades)
       VALUES (${userId}, ${handle}, ${JSON.stringify(unlocked_levels)}, ${JSON.stringify(upgrades)})
@@ -26,8 +45,8 @@ export async function POST(req: Request){
         upgrades = EXCLUDED.upgrades,
         updated_at = now()
     `;
-    return NextResponse.json({ ok:true });
-  }catch(err:any){
-    return NextResponse.json({ ok:false, error: err?.message ?? 'error' }, { status:500 });
+    return NextResponse.json({ ok: true });
+  } catch (err: any) {
+    return NextResponse.json({ ok: false, error: err?.message ?? 'error' }, { status: 500 });
   }
 }

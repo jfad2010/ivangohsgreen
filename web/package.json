@@ -8,17 +8,21 @@
     "build": "next build",
     "start": "next start",
     "lint": "echo \"no lint configured\"",
-    "db:init": "node scripts/db-init.mjs"
+    "db:init": "node scripts/db-init.mjs",
+    "test": "tsx test/api-routes.test.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^0.8.0",
     "next": "^14.2.0",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^18.2.0",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
     "@types/react": "^18.2.0",
-    "typescript": "^5.4.0"
+    "typescript": "^5.4.0",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.7.0"
   }
 }
