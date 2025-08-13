@@ -1,0 +1,13 @@
+{
+  "name": "lf-starter",
+  "private": true,
+  "workspaces": [
+    "game",
+    "web"
+  ],
+  "scripts": {
+    "build": "npm -w game run build && npm -w web run build",
+    "build:game": "npm -w game run build",
+    "sync:game": "node scripts/sync-game.mjs"
+  }
+}
