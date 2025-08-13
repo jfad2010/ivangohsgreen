@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { BaseBoss } from './BaseBoss';
 
 // Boss phases
 enum Phase {
@@ -8,7 +9,7 @@ enum Phase {
   HEAVY_ORBS = 'HEAVY_ORBS',
 }
 
-export class JoJoBoss extends Phaser.Physics.Arcade.Sprite {
+export class JoJoBoss extends BaseBoss {
   private phase: Phase = Phase.ENGAGE;
   private cycle: Phase[] = [Phase.VOLLEY, Phase.RAIN, Phase.HEAVY_ORBS];
   private cycleIndex = 0;
@@ -17,6 +18,7 @@ export class JoJoBoss extends Phaser.Physics.Arcade.Sprite {
   private enraged = false;
   private maxHp = 100;
   private bullets: Phaser.Physics.Arcade.Group;
+  private hpBar: Phaser.GameObjects.Graphics;
 
   constructor(
     scene: Phaser.Scene,
@@ -24,13 +26,15 @@ export class JoJoBoss extends Phaser.Physics.Arcade.Sprite {
     y: number,
     bullets: Phaser.Physics.Arcade.Group,
   ) {
-    super(scene, x, y, 'hr_1');
+    super(scene, x, y, 'hr_1', 100);
     this.bullets = bullets;
-
-    scene.add.existing(this);
-    scene.physics.add.existing(this);
+    this.hpBar = scene.add.graphics();
     this.setImmovable(true);
-    this.setData('hp', this.maxHp);
+
+    this.on('onDefeated', () => {
+      this.hpBar.destroy();
+      this.destroy();
+    });
 
     this.startEngage();
   }
@@ -38,14 +42,27 @@ export class JoJoBoss extends Phaser.Physics.Arcade.Sprite {
   preUpdate(time: number, delta: number) {
     super.preUpdate(time, delta);
     this.checkEnrage();
+    this.drawHpBar();
   }
 
   private checkEnrage() {
-    const hp = this.getData('hp') as number;
+    const hp = this.hp;
     if (!this.enraged && hp <= this.maxHp * 0.3) {
       this.enraged = true;
       console.log('JoJo enraged!');
     }
+  }
+
+  private drawHpBar() {
+    const width = 60;
+    const height = 6;
+    const x = this.x - width / 2;
+    const y = this.y - this.height / 2 - 10;
+    this.hpBar.clear();
+    this.hpBar.fillStyle(0x000000, 1).fillRect(x - 1, y - 1, width + 2, height + 2);
+    this.hpBar.fillStyle(0xff0000, 1).fillRect(x, y, width * (this.hp / this.maxHp), height);
+    this.hpBar.lineStyle(1, 0xffffff).strokeRect(x, y, width, height);
+    this.hpBar.setDepth(this.depth + 1);
   }
 
   private startEngage() {

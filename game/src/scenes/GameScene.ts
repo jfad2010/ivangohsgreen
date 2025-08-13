@@ -1,6 +1,5 @@
 import Phaser from 'phaser';
-import { DummyBoss } from '../entities/boss/DummyBoss';
-import { laneBand, laneOverlap } from '../systems/collision';
+import { laneBand, laneOverlap, projectileHitsEnemy } from '../systems/collision';
 import { JoJoBoss } from '../entities/boss/JoJoBoss';
 
 const LANE_TOP = 360;
@@ -31,8 +30,6 @@ export class GameScene extends Phaser.Scene {
   private pickups!: Phaser.Physics.Arcade.Group;
   private boss?: JoJoBoss;
 
-  private boss!: DummyBoss;
-
   private hudText!: Phaser.GameObjects.Text;
 
   constructor(){ super('game'); }
@@ -53,14 +50,6 @@ export class GameScene extends Phaser.Scene {
     this.enemies = this.physics.add.group();
     this.bullets = this.physics.add.group();
     this.pickups = this.physics.add.group();
-
-    // dummy boss
-    this.boss = new DummyBoss(this, 1000, LANE_TOP);
-
-    this.time.addEvent({
-      delay: 2000,
-      callback: () => this.boss.setState('rage')
-    });
 
     // spawn a few enemies to start
     for(let i=0;i<20;i++) this.spawnEnemy(600 + i*180 + Phaser.Math.Between(-40,40));
@@ -90,13 +79,17 @@ export class GameScene extends Phaser.Scene {
     // collisions
     this.physics.add.overlap(this.bullets, this.enemies, (b, e) => {
       const bullet = b as Phaser.Physics.Arcade.Sprite;
-      const enemy = e as Phaser.Physics.Arcade.Sprite;
-      if (!laneOverlap(bullet.y, enemy.y, laneBand(enemy))) return;
+      const enemy = e as Phaser.Physics.Arcade.Sprite & { takeDamage?: (n: number) => void };
+      if (!projectileHitsEnemy(bullet, enemy)) return;
       bullet.destroy();
       enemy.setTint(0xff6666);
-      const hp = (enemy.getData('hp') ?? 5) - 2;
-      enemy.setData('hp', hp);
-      if (hp <= 0) enemy.destroy();
+      if (typeof enemy.takeDamage === 'function') {
+        enemy.takeDamage(2);
+      } else {
+        const hp = (enemy.getData('hp') ?? 5) - 2;
+        enemy.setData('hp', hp);
+        if (hp <= 0) enemy.destroy();
+      }
     });
     this.physics.add.overlap(this.enemies, this.player, (e, p) => {
       const enemy = e as Phaser.Physics.Arcade.Sprite;
@@ -181,6 +174,23 @@ export class GameScene extends Phaser.Scene {
       b.setVelocityX(this.player.flipX ? -480 : 480);
       this.updateDepth(b);
       this.bullets.add(b);
+    }
+
+    // beam damage
+    if (this.boss) {
+      const beam = this.player.getData('beam') as Phaser.GameObjects.GameObject | undefined;
+      if (beam && beam.active) {
+        const beamBounds = (beam as any).getBounds?.();
+        if (beamBounds) {
+          const bossBounds = this.boss.getBounds();
+          if (
+            Phaser.Geom.Rectangle.Overlaps(beamBounds, bossBounds) &&
+            laneOverlap(this.player.y, this.boss.y, laneBand(this.boss))
+          ) {
+            this.boss.takeDamage(10 * dt);
+          }
+        }
+      }
     }
 
     // cull enemies behind
