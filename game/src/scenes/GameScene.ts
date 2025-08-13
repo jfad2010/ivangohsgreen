@@ -21,6 +21,7 @@ type Keys = {
   one: Phaser.Input.Keyboard.Key;
   two: Phaser.Input.Keyboard.Key;
   three: Phaser.Input.Keyboard.Key;
+  q: Phaser.Input.Keyboard.Key;
 };
 
 export class GameScene extends Phaser.Scene {
@@ -34,7 +35,10 @@ export class GameScene extends Phaser.Scene {
   private pickups!: Phaser.Physics.Arcade.Group;
   private boss?: JoJoBoss;
 
-  private ally!: Grad;
+  private allies!: Grad[];
+  private lettuce = 5;
+  private recruitCost = 3;
+  private toastText?: Phaser.GameObjects.Text;
 
   private hudText!: Phaser.GameObjects.Text;
 
@@ -53,8 +57,9 @@ export class GameScene extends Phaser.Scene {
     this.player.setData('size', 'M');
 
     // ally spawn
-    this.ally = new Grad(this, this.player.x - 80, this.player.y);
-    this.ally.setDepth(this.ally.y);
+    const initialGrad = new Grad(this, this.player.x - 80, this.player.y);
+    initialGrad.setDepth(initialGrad.y);
+    this.allies = [initialGrad];
 
     // groups
     this.enemies = this.physics.add.group();
@@ -86,7 +91,8 @@ export class GameScene extends Phaser.Scene {
       space: k.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE),
       one: k.addKey(Phaser.Input.Keyboard.KeyCodes.ONE),
       two: k.addKey(Phaser.Input.Keyboard.KeyCodes.TWO),
-      three: k.addKey(Phaser.Input.Keyboard.KeyCodes.THREE)
+      three: k.addKey(Phaser.Input.Keyboard.KeyCodes.THREE),
+      q: k.addKey(Phaser.Input.Keyboard.KeyCodes.Q)
     };
 
     // collisions
@@ -117,10 +123,11 @@ export class GameScene extends Phaser.Scene {
       pickup.destroy();
     });
 
-    this.hudText = this.add.text(16, 16, 'A/D move · W/S lane · Space fire · 1 Retreat 2 Hold 3 Advance', {
+    this.hudText = this.add.text(16, 16, '', {
       fontFamily: 'system-ui, Segoe UI, Roboto, Helvetica, Arial',
       color: '#cfe6ff', fontSize: '14px'
     }).setScrollFactor(0);
+    this.refreshHud();
 
     // timed enemy spawns
     this.time.addEvent({ delay: 1500, loop: true, callback: () => {
@@ -152,9 +159,10 @@ export class GameScene extends Phaser.Scene {
     const dt = delta/1000;
 
     // ally command input
-    if (Phaser.Input.Keyboard.JustDown(this.keys.one)) this.ally.setCommand('retreat');
-    if (Phaser.Input.Keyboard.JustDown(this.keys.two)) this.ally.setCommand('hold');
-    if (Phaser.Input.Keyboard.JustDown(this.keys.three)) this.ally.setCommand('advance');
+    if (Phaser.Input.Keyboard.JustDown(this.keys.one)) this.allies.forEach(a => a.setCommand('retreat'));
+    if (Phaser.Input.Keyboard.JustDown(this.keys.two)) this.allies.forEach(a => a.setCommand('hold'));
+    if (Phaser.Input.Keyboard.JustDown(this.keys.three)) this.allies.forEach(a => a.setCommand('advance'));
+    if (Phaser.Input.Keyboard.JustDown(this.keys.q)) this.recruitGrad();
 
     // movement (belt scroller: allow y within band, x scroll)
     const vx = (this.isDown(this.keys.d, this.keys.right) ? 1 : 0) - (this.isDown(this.keys.a, this.keys.left) ? 1 : 0);
@@ -182,9 +190,11 @@ export class GameScene extends Phaser.Scene {
     }
     this.updateDepth(this.player);
 
-    // update ally after player movement
-    this.ally.update(dt, this.player);
-    this.updateDepth(this.ally);
+    // update allies after player movement
+    this.allies.forEach(a => {
+      a.update(dt, this.player);
+      this.updateDepth(a);
+    });
 
     // face direction
     this.player.setFlipX(vx < 0);
@@ -239,5 +249,36 @@ export class GameScene extends Phaser.Scene {
 
   private updateDepth(entity: Phaser.GameObjects.Sprite){
     entity.setDepth(entity.y);
+  }
+
+  private recruitGrad(){
+    if (this.lettuce >= this.recruitCost) {
+      this.lettuce -= this.recruitCost;
+      const g = new Grad(this, this.player.x - 80, this.player.y);
+      g.setDepth(g.y);
+      this.allies.push(g);
+      this.refreshHud();
+    } else {
+      this.showToast('Not enough lettuce');
+    }
+  }
+
+  private refreshHud(){
+    this.hudText.setText(
+      `A/D move · W/S lane · Space fire · 1 Retreat 2 Hold 3 Advance · Lettuce: ${this.lettuce}`
+    );
+  }
+
+  private showToast(msg: string){
+    if (this.toastText) this.toastText.destroy();
+    this.toastText = this.add.text(16, 40, msg, {
+      fontFamily: 'system-ui, Segoe UI, Roboto, Helvetica, Arial',
+      color: '#ff6666',
+      fontSize: '14px'
+    }).setScrollFactor(0);
+    this.time.delayedCall(1000, () => {
+      this.toastText?.destroy();
+      this.toastText = undefined;
+    });
   }
 }
