@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { laneBand, laneOverlap } from '../systems/collision';
+import { JoJoBoss } from '../entities/boss/JoJoBoss';
 
 const LANE_TOP = 360;
 const LANE_BOTTOM = 520;
@@ -27,6 +28,7 @@ export class GameScene extends Phaser.Scene {
   private enemies!: Phaser.Physics.Arcade.Group;
   private bullets!: Phaser.Physics.Arcade.Group;
   private pickups!: Phaser.Physics.Arcade.Group;
+  private boss?: JoJoBoss;
 
   private hudText!: Phaser.GameObjects.Text;
 
@@ -51,6 +53,11 @@ export class GameScene extends Phaser.Scene {
 
     // spawn a few enemies to start
     for(let i=0;i<20;i++) this.spawnEnemy(600 + i*180 + Phaser.Math.Between(-40,40));
+
+    // boss spawn
+    this.boss = new JoJoBoss(this, 2400, LANE_BOTTOM, this.bullets);
+    this.boss.setDepth(this.boss.y);
+    this.enemies.add(this.boss);
 
     // camera follows
     this.cameras.main.startFollow(this.player, true, 0.08, 0.08, -200, 120);
