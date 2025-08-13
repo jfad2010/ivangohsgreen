@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
 import { laneBand, laneOverlap, projectileHitsEnemy } from '../systems/collision';
 import { JoJoBoss } from '../entities/boss/JoJoBoss';
-import { Grad } from '../entities/ally/Grad';
+import { Grad, GradCommand } from '../entities/ally/Grad';
+import HUD from '../ui/hud';
 import { placeBigPickups, dropSmallLettuce, updatePickups } from '../systems/pickups';
 
 const LANE_TOP = 360;
@@ -41,7 +42,10 @@ export class GameScene extends Phaser.Scene {
   private recruitCost = 3;
   private toastText?: Phaser.GameObjects.Text;
 
-  private hudText!: Phaser.GameObjects.Text;
+  private instructionsText!: Phaser.GameObjects.Text;
+  private hud!: HUD;
+  private currentCommand: GradCommand = 'hold';
+  private bossMaxHp = 0;
 
   constructor(){ super('game'); }
 
@@ -56,6 +60,9 @@ export class GameScene extends Phaser.Scene {
     this.player.setCollideWorldBounds(true);
     this.player.setDepth(this.player.y);
     this.player.setData('size', 'M');
+    this.player.setData('hp', 10);
+    this.player.setData('beamCharge', 1);
+    this.player.setData('beamCooldown', 0);
 
     // ally spawn
     const initialGrad = new Grad(this, this.player.x - 80, this.player.y);
@@ -77,6 +84,7 @@ export class GameScene extends Phaser.Scene {
     this.boss = new JoJoBoss(this, 2400, LANE_BOTTOM, this.bullets);
     this.boss.setDepth(this.boss.y);
     this.enemies.add(this.boss);
+    this.bossMaxHp = this.boss.hp;
 
     // camera follows
     this.cameras.main.startFollow(this.player, true, 0.08, 0.08, -200, 120);
@@ -135,15 +143,17 @@ export class GameScene extends Phaser.Scene {
       } else {
         this.lettuce += 1;
       }
-      this.refreshHud();
+      // HUD updates automatically
       pickup.destroy();
     });
 
-    this.hudText = this.add.text(16, 16, '', {
-      fontFamily: 'system-ui, Segoe UI, Roboto, Helvetica, Arial',
-      color: '#cfe6ff', fontSize: '14px'
-    }).setScrollFactor(0);
-    this.refreshHud();
+    this.instructionsText = this.add.text(16, 16,
+      'A/D move · W/S lane · Space fire · 1 Retreat 2 Hold 3 Advance', {
+        fontFamily: 'system-ui, Segoe UI, Roboto, Helvetica, Arial',
+        color: '#cfe6ff', fontSize: '14px'
+      }).setScrollFactor(0);
+
+    this.hud = new HUD(this);
 
     // timed enemy spawns
     this.time.addEvent({ delay: 1500, loop: true, callback: () => {
@@ -175,10 +185,34 @@ export class GameScene extends Phaser.Scene {
     const dt = delta/1000;
 
     // ally command input
-    if (Phaser.Input.Keyboard.JustDown(this.keys.one)) this.allies.forEach(a => a.setCommand('retreat'));
-    if (Phaser.Input.Keyboard.JustDown(this.keys.two)) this.allies.forEach(a => a.setCommand('hold'));
-    if (Phaser.Input.Keyboard.JustDown(this.keys.three)) this.allies.forEach(a => a.setCommand('advance'));
+    if (Phaser.Input.Keyboard.JustDown(this.keys.one)) {
+      this.currentCommand = 'retreat';
+      this.allies.forEach(a => a.setCommand('retreat'));
+    }
+    if (Phaser.Input.Keyboard.JustDown(this.keys.two)) {
+      this.currentCommand = 'hold';
+      this.allies.forEach(a => a.setCommand('hold'));
+    }
+    if (Phaser.Input.Keyboard.JustDown(this.keys.three)) {
+      this.currentCommand = 'advance';
+      this.allies.forEach(a => a.setCommand('advance'));
+    }
     if (Phaser.Input.Keyboard.JustDown(this.keys.q)) this.recruitGrad();
+
+    // beam charge / cooldown update
+    const charge = (this.player.getData('beamCharge') as number) ?? 0;
+    const cooldown = (this.player.getData('beamCooldown') as number) ?? 0;
+    const COOLDOWN_TIME = 3; // seconds
+    const CHARGE_RATE = 0.3; // per second
+    if (cooldown > 0) {
+      const newCooldown = Math.max(0, cooldown - dt / COOLDOWN_TIME);
+      this.player.setData('beamCooldown', newCooldown);
+      if (newCooldown === 0) {
+        this.player.setData('beamCharge', 0);
+      }
+    } else if (charge < 1) {
+      this.player.setData('beamCharge', Math.min(1, charge + dt * CHARGE_RATE));
+    }
 
     // movement (belt scroller: allow y within band, x scroll)
     const vx = (this.isDown(this.keys.d, this.keys.right) ? 1 : 0) - (this.isDown(this.keys.a, this.keys.left) ? 1 : 0);
@@ -222,6 +256,10 @@ export class GameScene extends Phaser.Scene {
       b.setVelocityX(this.player.flipX ? -480 : 480);
       this.updateDepth(b);
       this.bullets.add(b);
+      if ((this.player.getData('beamCharge') as number ?? 0) >= 1 && (this.player.getData('beamCooldown') as number ?? 0) <= 0) {
+        this.player.setData('beamCharge', 0);
+        this.player.setData('beamCooldown', 1);
+      }
     }
 
     // beam damage
@@ -260,6 +298,16 @@ export class GameScene extends Phaser.Scene {
       this.updateDepth(s);
       return true;
     });
+    this.hud.update(dt, {
+      lettuce: this.lettuce,
+      grads: this.allies.length,
+      hp: (this.player.getData('hp') as number) ?? 10,
+      bossHp: this.boss ? this.boss.hp : 0,
+      bossMaxHp: this.boss ? this.bossMaxHp : 0,
+      command: this.currentCommand,
+      beamCharge: (this.player.getData('beamCharge') as number) ?? 0,
+      beamCooldown: (this.player.getData('beamCooldown') as number) ?? 0
+    });
   }
 
   private isDown(...keys: Phaser.Input.Keyboard.Key[]){
@@ -276,17 +324,13 @@ export class GameScene extends Phaser.Scene {
       const g = new Grad(this, this.player.x - 80, this.player.y);
       g.setDepth(g.y);
       this.allies.push(g);
-      this.refreshHud();
+      // HUD updates automatically
     } else {
       this.showToast('Not enough lettuce');
     }
   }
 
-  private refreshHud(){
-    this.hudText.setText(
-      `A/D move · W/S lane · Space fire · 1 Retreat 2 Hold 3 Advance · Lettuce: ${this.lettuce}`
-    );
-  }
+  // HUD refresh method removed; HUD updates each frame
 
   private showToast(msg: string){
     if (this.toastText) this.toastText.destroy();
