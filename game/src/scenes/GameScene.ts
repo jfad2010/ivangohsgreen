@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { laneBand, laneOverlap, projectileHitsEnemy } from '../systems/collision';
 import { JoJoBoss } from '../entities/boss/JoJoBoss';
 import { Grad } from '../entities/ally/Grad';
+import { placeBigPickups, dropSmallLettuce, updatePickups } from '../systems/pickups';
 
 const LANE_TOP = 360;
 const LANE_BOTTOM = 520;
@@ -66,6 +67,9 @@ export class GameScene extends Phaser.Scene {
     this.bullets = this.physics.add.group();
     this.pickups = this.physics.add.group();
 
+    // big pickups along path
+    placeBigPickups(this, this.pickups, this.worldWidth, 8, LANE_TOP, LANE_BOTTOM);
+
     // spawn a few enemies to start
     for(let i=0;i<20;i++) this.spawnEnemy(600 + i*180 + Phaser.Math.Between(-40,40));
 
@@ -107,7 +111,10 @@ export class GameScene extends Phaser.Scene {
       } else {
         const hp = (enemy.getData('hp') ?? 5) - 2;
         enemy.setData('hp', hp);
-        if (hp <= 0) enemy.destroy();
+        if (hp <= 0) {
+          dropSmallLettuce(this, this.pickups, enemy.x, enemy.y);
+          enemy.destroy();
+        }
       }
     });
     this.physics.add.overlap(this.enemies, this.player, (e, p) => {
@@ -120,6 +127,15 @@ export class GameScene extends Phaser.Scene {
       const pickup = p as Phaser.Physics.Arcade.Sprite;
       const player = pl as Phaser.Physics.Arcade.Sprite;
       if (!laneOverlap(pickup.y, player.y, laneBand(player))) return;
+      const type = pickup.getData('type');
+      if (type === 'big') {
+        this.lettuce += 3;
+        const hp = player.getData('hp') ?? 10;
+        player.setData('hp', Math.min(hp + 1, 10));
+      } else {
+        this.lettuce += 1;
+      }
+      this.refreshHud();
       pickup.destroy();
     });
 
@@ -224,6 +240,9 @@ export class GameScene extends Phaser.Scene {
         }
       }
     }
+
+    // update pickups (magnetism)
+    updatePickups(this, this.pickups, this.player);
 
     // cull enemies behind
     this.enemies.children.iterate((obj: Phaser.GameObjects.GameObject) => {
