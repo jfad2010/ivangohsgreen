@@ -7,7 +7,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "echo \"no lint configured\""
+    "lint": "echo \"no lint configured\"",
+    "db:init": "node scripts/db-init.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "^0.8.0",

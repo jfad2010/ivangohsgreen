@@ -106,6 +106,14 @@ lf-starter/
   * `runs`: Individual play sessions.
   * `profiles`: Persistent unlocks, upgrades.
 
+To bootstrap the schema locally:
+
+```bash
+NEON_DATABASE_URL="postgres://user:pass@host/db" npm -w web run db:init
+```
+
+This executes `web/db/init.sql` and is safe to run multiple times.
+
 ---
 
 ## **Dev Workflow**
