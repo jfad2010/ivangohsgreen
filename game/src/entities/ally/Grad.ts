@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { createAura, createNameplate, titleByLevel } from '../../renderHelpers';
 
 export type GradCommand = 'retreat' | 'hold' | 'advance';
 
@@ -12,7 +13,11 @@ export class Grad extends Phaser.Physics.Arcade.Sprite {
   holdOffset: number;
   retreatOffset: number;
 
-  constructor(scene: Phaser.Scene, x: number, y: number) {
+  level: number;
+  aura: Phaser.GameObjects.Arc;
+  nameplate: Phaser.GameObjects.Text;
+
+  constructor(scene: Phaser.Scene, x: number, y: number, level = 1) {
     super(scene, x, y, 'joe');
     scene.add.existing(this);
     scene.physics.add.existing(this);
@@ -26,7 +31,25 @@ export class Grad extends Phaser.Physics.Arcade.Sprite {
     this.holdOffset = 60;
     this.retreatOffset = 120;
 
+    this.level = level;
+    this.aura = createAura(scene, 0x00ff00, this.level);
+    const title = titleByLevel(this.level);
+    const text = title ? `Grad - ${title}` : 'Grad';
+    this.nameplate = createNameplate(scene, text);
+
     this.setData('size', 'M');
+  }
+
+  setLevel(level: number) {
+    this.level = level;
+    const title = titleByLevel(level);
+    const text = title ? `Grad - ${title}` : 'Grad';
+    this.nameplate.setText(text);
+
+    const radius = 20 + level * 4;
+    const alpha = Math.min(1, 0.2 + level * 0.1);
+    this.aura.setRadius(radius);
+    this.aura.setFillStyle(this.aura.fillColor, alpha);
   }
 
   setCommand(cmd: GradCommand) {
@@ -71,6 +94,10 @@ export class Grad extends Phaser.Physics.Arcade.Sprite {
     }
 
     this.setDepth(this.y);
+    this.aura.setPosition(this.x, this.y);
+    this.aura.setDepth(this.depth - 1);
+    this.nameplate.setPosition(this.x, this.y - this.height);
+    this.nameplate.setDepth(this.depth + 1);
   }
 }
 
