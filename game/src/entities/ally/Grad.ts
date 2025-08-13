@@ -22,8 +22,8 @@ export class Grad extends Phaser.Physics.Arcade.Sprite {
   damage: number;
   pierce: number;
 
-  constructor(scene: Phaser.Scene, x: number, y: number, level = 1) {
-    super(scene, x, y, 'joe');
+  constructor(scene: Phaser.Scene, x: number, y: number, texture = 'joe', level = 1, auraColor = 0x00ff00) {
+    super(scene, x, y, texture);
     scene.add.existing(this);
     scene.physics.add.existing(this);
 
@@ -37,7 +37,7 @@ export class Grad extends Phaser.Physics.Arcade.Sprite {
     this.retreatOffset = 120;
 
     this.level = level;
-    this.aura = createAura(scene, 0x00ff00, this.level);
+    this.aura = createAura(scene, auraColor, this.level);
     const title = titleByLevel(this.level);
     const text = title ? `Grad - ${title}` : 'Grad';
     this.nameplate = createNameplate(scene, text);
