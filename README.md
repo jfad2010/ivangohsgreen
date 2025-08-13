@@ -120,12 +120,14 @@ npm -w web run dev
 # Run Phaser dev server
 npm -w game run dev
 
-# Build game and sync into web
+# Build Phaser game (hashed assets) and sync into web/public/game
 npm run build:game && npm run sync:game
 
 # Build Next.js for prod
 npm -w web run build && npm -w web run start
 ```
+
+The `sync:game` script copies the entire `game/dist` output, including hashed filenames, into `web/public/game`.
 
 ---
 

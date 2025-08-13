@@ -10,20 +10,5 @@ if (!fs.existsSync(gameDist)) {
   process.exit(1);
 }
 fs.rmSync(webPublicGame, { recursive: true, force: true });
-fs.mkdirSync(webPublicGame, { recursive: true });
-
-// copy recursively
-function copyDir(src, dest) {
-  for (const item of fs.readdirSync(src, { withFileTypes: true })) {
-    const s = path.join(src, item.name);
-    const d = path.join(dest, item.name);
-    if (item.isDirectory()) {
-      fs.mkdirSync(d, { recursive: true });
-      copyDir(s, d);
-    } else if (item.isFile()) {
-      fs.copyFileSync(s, d);
-    }
-  }
-}
-copyDir(gameDist, webPublicGame);
+fs.cpSync(gameDist, webPublicGame, { recursive: true });
 console.log('Copied game/dist -> web/public/game');
